@@ -15,6 +15,9 @@ from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
 from backend.database import init_db, get_db, ReturnRecord
 
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+ARTIFACTS_DIR = os.path.join(ROOT_DIR, "artifacts")
+
 app = FastAPI(title="E-Commerce Customer Return Reason Classifier API", version="1.0.0")
 
 app.add_middleware(
@@ -27,25 +30,39 @@ app.add_middleware(
 LABELS = ["Sizing", "Damaged Item", "Wrong Product", "Late Delivery"]
 
 # Load lightweight TF-IDF + Logistic Regression at startup (< 60 MB RAM)
-tfidf = joblib.load("artifacts/tfidf_vectorizer.joblib")
-lr_model = joblib.load("artifacts/logreg_model.joblib")
+tfidf = joblib.load(os.path.join(ARTIFACTS_DIR, "tfidf_vectorizer.joblib"))
+lr_model = joblib.load(os.path.join(ARTIFACTS_DIR, "logreg_model.joblib"))
 
-# Lazy-loaded DistilBERT globals (prevents Render 512MB OOM at startup)
+# Lazy-loaded DistilBERT globals (prevents cloud OOM at startup)
 _tokenizer = None
 _bert_model = None
+
 
 def get_bert():
     global _tokenizer, _bert_model
     if _tokenizer is None or _bert_model is None:
-        _tokenizer = AutoTokenizer.from_pretrained("artifacts/distilbert_model")
+        local_dir = os.path.join(ARTIFACTS_DIR, "distilbert_model")
+        has_local_weights = (
+            os.path.exists(os.path.join(local_dir, "model.safetensors"))
+            or os.path.exists(os.path.join(local_dir, "pytorch_model.bin"))
+        )
+        model_path = local_dir if has_local_weights else "distilbert-base-uncased"
+
+        _tokenizer = AutoTokenizer.from_pretrained(model_path)
         _bert_model = AutoModelForSequenceClassification.from_pretrained(
-            "artifacts/distilbert_model", low_cpu_mem_usage=True
+            model_path,
+            num_labels=len(LABELS),
+            id2label={i: label for i, label in enumerate(LABELS)},
+            label2id={label: i for i, label in enumerate(LABELS)},
+            low_cpu_mem_usage=True,
         )
         _bert_model.eval()
         gc.collect()
     return _tokenizer, _bert_model
 
+
 init_db()
+
 
 def clean_text(text: str) -> str:
     text = str(text).lower().strip()
@@ -53,6 +70,7 @@ def clean_text(text: str) -> str:
     text = re.sub(r"[^a-z0-9\s.,!?'-]", " ", text)
     text = re.sub(r"\s+", " ", text).strip()
     return text
+
 
 def run_inference(text: str, model_type: str):
     cleaned = clean_text(text)
@@ -72,22 +90,27 @@ def run_inference(text: str, model_type: str):
         prob_map = {LABELS[i]: round(float(probs[i]), 4) for i in range(len(LABELS))}
         return LABELS[pred_idx], round(float(probs[pred_idx]), 4), prob_map
 
+
 class PredictRequest(BaseModel):
     order_id: Optional[str] = "ORD-1001"
     comment: str
-    model_type: str = "distilbert"
+    model_type: str = "tfidf_logreg"
+
 
 @app.get("/")
 @app.get("/health")
 def health():
     return {"status": "ok"}
 
+
 @app.get("/metrics")
 def get_metrics():
-    if not os.path.exists("artifacts/metrics.json"):
+    metrics_path = os.path.join(ARTIFACTS_DIR, "metrics.json")
+    if not os.path.exists(metrics_path):
         raise HTTPException(status_code=404, detail="Metrics file not found.")
-    with open("artifacts/metrics.json") as f:
+    with open(metrics_path) as f:
         return json.load(f)
+
 
 @app.post("/predict")
 def predict_single(req: PredictRequest, db: Session = Depends(get_db)):
@@ -117,10 +140,11 @@ def predict_single(req: PredictRequest, db: Session = Depends(get_db)):
         "model_used": req.model_type,
     }
 
+
 @app.post("/predict-batch")
 async def predict_batch(
     file: UploadFile = File(...),
-    model_type: str = Form("distilbert"),
+    model_type: str = Form("tfidf_logreg"),
     db: Session = Depends(get_db),
 ):
     content = await file.read()
@@ -162,6 +186,7 @@ async def predict_batch(
     db.commit()
     return {"total_processed": len(results), "results": results}
 
+
 @app.get("/records")
 def list_records(limit: int = 200, db: Session = Depends(get_db)):
     records = db.query(ReturnRecord).order_by(ReturnRecord.id.desc()).limit(limit).all()
@@ -177,6 +202,7 @@ def list_records(limit: int = 200, db: Session = Depends(get_db)):
         }
         for r in records
     ]
+
 
 @app.delete("/records")
 def clear_records(db: Session = Depends(get_db)):
