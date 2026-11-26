@@ -1,0 +1,16 @@
+pandas
+numpy
+scikit-learn
+torch
+transformers
+datasets
+fastapi
+uvicorn
+sqlalchemy
+pydantic
+streamlit
+requests
+matplotlib
+seaborn
+python-multipart
+joblib
