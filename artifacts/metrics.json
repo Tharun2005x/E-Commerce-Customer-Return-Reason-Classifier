@@ -1,0 +1,146 @@
+{
+  "labels": [
+    "Sizing",
+    "Damaged Item",
+    "Wrong Product",
+    "Late Delivery"
+  ],
+  "tfidf_logreg": {
+    "accuracy": 0.9125,
+    "macro_f1": 0.9107,
+    "confusion_matrix": [
+      [
+        60,
+        0,
+        0,
+        0
+      ],
+      [
+        20,
+        40,
+        0,
+        0
+      ],
+      [
+        1,
+        0,
+        59,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        60
+      ]
+    ],
+    "report": {
+      "Sizing": {
+        "precision": 0.7407407407407407,
+        "recall": 1.0,
+        "f1-score": 0.851063829787234,
+        "support": 60.0
+      },
+      "Damaged Item": {
+        "precision": 1.0,
+        "recall": 0.6666666666666666,
+        "f1-score": 0.8,
+        "support": 60.0
+      },
+      "Wrong Product": {
+        "precision": 1.0,
+        "recall": 0.9833333333333333,
+        "f1-score": 0.9915966386554622,
+        "support": 60.0
+      },
+      "Late Delivery": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 60.0
+      },
+      "accuracy": 0.9125,
+      "macro avg": {
+        "precision": 0.9351851851851851,
+        "recall": 0.9125,
+        "f1-score": 0.9106651171106741,
+        "support": 240.0
+      },
+      "weighted avg": {
+        "precision": 0.9351851851851852,
+        "recall": 0.9125,
+        "f1-score": 0.9106651171106741,
+        "support": 240.0
+      }
+    }
+  },
+  "distilbert": {
+    "accuracy": 0.975,
+    "macro_f1": 0.9751,
+    "confusion_matrix": [
+      [
+        59,
+        1,
+        0,
+        0
+      ],
+      [
+        4,
+        56,
+        0,
+        0
+      ],
+      [
+        1,
+        0,
+        59,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        60
+      ]
+    ],
+    "report": {
+      "Sizing": {
+        "precision": 0.921875,
+        "recall": 0.9833333333333333,
+        "f1-score": 0.9516129032258065,
+        "support": 60.0
+      },
+      "Damaged Item": {
+        "precision": 0.9824561403508771,
+        "recall": 0.9333333333333333,
+        "f1-score": 0.9572649572649573,
+        "support": 60.0
+      },
+      "Wrong Product": {
+        "precision": 1.0,
+        "recall": 0.9833333333333333,
+        "f1-score": 0.9915966386554622,
+        "support": 60.0
+      },
+      "Late Delivery": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 60.0
+      },
+      "accuracy": 0.975,
+      "macro avg": {
+        "precision": 0.9760827850877193,
+        "recall": 0.975,
+        "f1-score": 0.9751186247865565,
+        "support": 240.0
+      },
+      "weighted avg": {
+        "precision": 0.9760827850877193,
+        "recall": 0.975,
+        "f1-score": 0.9751186247865565,
+        "support": 240.0
+      }
+    }
+  }
+}

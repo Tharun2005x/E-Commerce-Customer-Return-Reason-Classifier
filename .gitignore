@@ -1,21 +1,6 @@
-# Python / Virtual Environment
 .venv/
-venv/
 __pycache__/
-*.py[cod]
-*$py.class
-
-# Model artifacts (generated via python ml/train_models.py; exceeds GitHub 100 MB limit)
-artifacts/
-
-# Local SQLite database & logs
+*.pyc
+artifacts/checkpoints/
 returns.db
-*.db
-*.sqlite
-*.log
-
-# IDE / OS
-.vscode/
-.idea/
-.DS_Store
-Thumbs.db
+artifacts/distilbert_model/model.safetensors

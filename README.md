@@ -16,8 +16,11 @@ Ecommerce-Return-Reason-Classifier/
 │   └── main.py                 # FastAPI REST API (single predict, batch CSV upload, DB logs, metrics)
 ├── frontend/
 │   └── app.py                  # Streamlit Operations Dashboard (Live Triage, Batch CSV, DB Logs, Eval)
-├── artifacts/                  # Auto-created during training (models, confusion matrices, metrics.json)
-├── requirements.txt
+├── artifacts/                  # Pre-trained TF-IDF + LR & metrics.json (DistilBERT generated via train_models.py)
+├── render.yaml                 # Render Blueprint configuration
+├── requirements.txt            # Full dependencies (local training + DistilBERT + serving)
+├── requirements-render.txt     # Lightweight runtime dependencies for Render Free Tier
+├── start.py                    # Combined FastAPI + Streamlit launcher for Render Web Service
 └── README.md
 ```
 
@@ -49,3 +52,16 @@ Ecommerce-Return-Reason-Classifier/
    ```powershell
    streamlit run frontend/app.py
    ```
+
+## Deploying to Render
+
+This repository includes `render.yaml`, `requirements-render.txt`, and `start.py` configured for Render's Free Tier (512 MB RAM):
+
+- **Option 1 (Blueprint):** In Render, select **New + → Blueprint**, connect this GitHub repo, and deploy (`render.yaml` configures everything automatically).
+- **Option 2 (Manual Web Service):**
+  - **Runtime:** Python 3
+  - **Build Command:** `pip install -r requirements-render.txt`
+  - **Start Command:** `python start.py`
+  - **Environment Variables:** `ENABLE_DISTILBERT=false`
+
+> **Note:** `artifacts/distilbert_model/` (255 MB) is excluded from Git due to GitHub's 100 MB limit and Render's 512 MB RAM limit; the deployed app automatically uses the bundled `TF-IDF + Logistic Regression` model while displaying both models' evaluation metrics in the comparison tab.

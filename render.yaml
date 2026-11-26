@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: ecommerce-return-reason-classifier
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements-render.txt
+    startCommand: python start.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.11"
+      - key: ENABLE_DISTILBERT
+        value: "false"

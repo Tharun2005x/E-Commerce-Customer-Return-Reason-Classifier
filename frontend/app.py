@@ -5,13 +5,17 @@ import streamlit as st
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-API_URL = os.getenv("API_URL", "http://127.0.0.1:8000")
+raw_api_url = os.getenv("API_URL", "http://127.0.0.1:8000").strip().rstrip("/")
+if raw_api_url and not raw_api_url.startswith(("http://", "https://")):
+    raw_api_url = f"http://{raw_api_url}"
+API_URL = raw_api_url
 
 
 def call_api(method: str, endpoint: str, **kwargs):
     """Send an HTTP request to the FastAPI backend and return (response, error_message)."""
+    timeout = kwargs.pop("timeout", 30)
     try:
-        res = requests.request(method, f"{API_URL}{endpoint}", timeout=30, **kwargs)
+        res = requests.request(method, f"{API_URL}{endpoint}", timeout=timeout, **kwargs)
         return res, None
     except requests.exceptions.RequestException as exc:
         return None, f"Could not reach backend API at `{API_URL}` ({exc}). Start it with `uvicorn backend.main:app --reload --port 8000`."
@@ -24,11 +28,25 @@ def extract_error_detail(res, fallback: str) -> str:
     except ValueError:
         return res.text or fallback
 
+
+def get_available_models():
+    """Fetch models available on the backend API."""
+    res, err = call_api("GET", "/health", timeout=2)
+    if not err and res.status_code == 200:
+        data = res.json()
+        models = data.get("available_models")
+        if isinstance(models, list) and models:
+            return models
+    return ["distilbert", "tfidf_logreg"]
+
+
 st.set_page_config(
     page_title="E-Commerce Return Reason Classifier",
     page_icon="📦",
     layout="wide",
 )
+
+available_models = get_available_models()
 
 st.title("📦 E-Commerce Customer Return Reason Classifier")
 st.caption("NLP-10 • Automated Root-Cause Triage (TF-IDF + Logistic Regression vs. DistilBERT) • FastAPI + SQLite")
@@ -37,9 +55,11 @@ with st.sidebar:
     st.header("⚙️ Model Settings")
     model_choice = st.selectbox(
         "Active Inference Model",
-        options=["distilbert", "tfidf_logreg"],
+        options=available_models,
         format_func=lambda x: "DistilBERT (Transformer)" if x == "distilbert" else "TF-IDF + Logistic Regression",
     )
+    if "distilbert" not in available_models:
+        st.info("Running lightweight `TF-IDF + Logistic Regression` mode (DistilBERT weights are omitted in cloud deployment).")
     st.markdown("---")
     st.markdown("**Target Root Causes:**")
     st.markdown("- 📏 `Sizing`\n- 💔 `Damaged Item`\n- 📦 `Wrong Product`\n- 🚚 `Late Delivery`")
