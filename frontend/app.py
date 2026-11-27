@@ -8,18 +8,143 @@ import streamlit as st
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# Ensure project root is importable for standalone Streamlit Cloud mode
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
 st.set_page_config(
-    page_title="NLP-10 | E-Commerce Return Reason Classifier",
+    page_title="ReturnSense AI | E-Commerce Return Reason Classifier",
     page_icon="📦",
     layout="wide",
+    initial_sidebar_state="expanded",
 )
 
-# Resolve API_URL from Streamlit Secrets or Environment Variables (optional)
+# --- Custom Modern UI Styling ---
+st.markdown(
+    """
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+    html, body, [class*="css"] {
+        font-family: 'Inter', sans-serif;
+    }
+
+    /* Hero Banner */
+    .hero-banner {
+        background: linear-gradient(135deg, #0F172A 0%, #1E3A8A 55%, #3B82F6 100%);
+        padding: 1.75rem 2rem;
+        border-radius: 16px;
+        color: #FFFFFF;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 10px 25px -5px rgba(30, 58, 138, 0.35);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+    .hero-badge {
+        display: inline-block;
+        background: rgba(255, 255, 255, 0.16);
+        backdrop-filter: blur(6px);
+        padding: 0.25rem 0.75rem;
+        border-radius: 999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        margin-bottom: 0.6rem;
+        color: #E0F2FE;
+    }
+    .hero-title {
+        font-size: 1.9rem;
+        font-weight: 800;
+        margin: 0 0 0.35rem 0;
+        letter-spacing: -0.02em;
+    }
+    .hero-subtitle {
+        font-size: 0.95rem;
+        color: #CBD5E1;
+        margin: 0;
+    }
+
+    /* Styled KPI Cards */
+    .kpi-card {
+        background: linear-gradient(180deg, rgba(30, 41, 59, 0.75) 0%, rgba(15, 23, 42, 0.9) 100%);
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        border-left: 4px solid #3B82F6;
+        border-radius: 12px;
+        padding: 1.1rem 1.25rem;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+    .kpi-label {
+        font-size: 0.78rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #94A3B8;
+        margin-bottom: 0.3rem;
+    }
+    .kpi-value {
+        font-size: 1.55rem;
+        font-weight: 800;
+        color: #F8FAFC;
+    }
+
+    /* Prediction Result Card */
+    .result-card {
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.14) 0%, rgba(59, 130, 246, 0.12) 100%);
+        border: 1px solid rgba(16, 185, 129, 0.4);
+        border-radius: 14px;
+        padding: 1.25rem 1.5rem;
+        margin: 1rem 0;
+    }
+    .reason-pill {
+        display: inline-block;
+        padding: 0.35rem 0.95rem;
+        border-radius: 999px;
+        font-weight: 700;
+        font-size: 0.95rem;
+        color: #FFFFFF;
+        margin-right: 0.75rem;
+    }
+
+    /* Sidebar Category Pills */
+    .cat-pill {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.5rem 0.8rem;
+        border-radius: 10px;
+        margin-bottom: 0.45rem;
+        font-size: 0.85rem;
+        font-weight: 600;
+        background: rgba(30, 41, 59, 0.65);
+        border: 1px solid rgba(148, 163, 184, 0.18);
+    }
+
+    /* Tabs Polish */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+        background-color: rgba(15, 23, 42, 0.45);
+        padding: 6px;
+        border-radius: 12px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        border-radius: 8px;
+        padding: 8px 16px;
+        font-weight: 600;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+# --- Category Color & Icon Mapping ---
+CATEGORY_META = {
+    "Sizing": {"icon": "📏", "color": "#3B82F6", "action": "Flag apparel size chart & fit guide"},
+    "Damaged Item": {"icon": "💔", "color": "#EF4444", "action": "Escalate to Warehouse QA & packaging team"},
+    "Wrong Product": {"icon": "📦", "color": "#F59E0B", "action": "Audit SKU barcode & fulfillment picking"},
+    "Late Delivery": {"icon": "🚚", "color": "#8B5CF6", "action": "Trigger logistics SLA delay alert"},
+}
+
+# --- Resolve Backend Mode (Remote FastAPI OR Standalone Cloud Engine) ---
 try:
     SECRET_API_URL = st.secrets.get("API_URL", "")
 except Exception:
@@ -27,7 +152,6 @@ except Exception:
 
 API_URL = (SECRET_API_URL or os.getenv("API_URL", "")).strip().rstrip("/")
 
-# Determine whether to use remote FastAPI or direct in-process backend
 USE_REMOTE_API = False
 if API_URL:
     try:
@@ -37,7 +161,6 @@ if API_URL:
     except Exception:
         USE_REMOTE_API = False
 else:
-    # Check if local FastAPI is running on port 8000
     try:
         r = requests.get("http://127.0.0.1:8000/health", timeout=1)
         if r.status_code == 200:
@@ -52,8 +175,7 @@ if not USE_REMOTE_API:
     init_db()
 
 
-# --- Unified Data Access Layer (Remote FastAPI OR Direct Python Backend) ---
-
+# --- Unified Data Access Layer ---
 def api_predict_single(order_id: str, comment: str, model_type: str) -> dict:
     if USE_REMOTE_API:
         resp = requests.post(
@@ -196,73 +318,137 @@ def api_get_metrics() -> dict:
         return json.load(f)
 
 
-# --- Sidebar Controls ---
-st.sidebar.header("⚙️ Model Settings")
-model_choice = st.sidebar.selectbox(
-    "Active Inference Model",
-    options=["distilbert", "tfidf_logreg"],
-    format_func=lambda x: "DistilBERT (Transformer)" if x == "distilbert" else "TF-IDF + Logistic Regression",
+# --- Sidebar Control Panel ---
+with st.sidebar:
+    st.markdown("## 🎛️ Control Center")
+    model_choice = st.selectbox(
+        "Active NLP Engine",
+        options=["tfidf_logreg", "distilbert"],
+        format_func=lambda x: (
+            "⚡ TF-IDF + Logistic Regression"
+            if x == "tfidf_logreg"
+            else "🧠 DistilBERT Transformer"
+        ),
+    )
+
+    st.markdown("---")
+    st.markdown("### 🏷️ Root-Cause Buckets")
+    for label, meta in CATEGORY_META.items():
+        st.markdown(
+            f"""
+            <div class="cat-pill" style="border-left: 4px solid {meta['color']};">
+                <span>{meta['icon']} {label}</span>
+                <span style="color:{meta['color']}; font-size:0.75rem;">● ACTIVE</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    st.markdown("---")
+    status_text = f"FastAPI ({API_URL})" if USE_REMOTE_API else "Standalone Cloud Engine"
+    st.caption(f"🟢 **Runtime:** `{status_text}`")
+    st.caption("🗄️ **Storage:** `SQLite (returns.db)`")
+
+
+# --- Hero Banner ---
+st.markdown(
+    """
+    <div class="hero-banner">
+        <div class="hero-badge">NLP-10 • Automated E-Commerce Operations Intelligence</div>
+        <div class="hero-title">📦 ReturnSense AI — Return Reason Classifier</div>
+        <div class="hero-subtitle">
+            Real-time customer return triage powered by <b>TF-IDF + Logistic Regression</b> &amp; <b>DistilBERT</b> with automated SQLite audit logging.
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
 )
 
-st.sidebar.markdown("---")
-st.sidebar.markdown("**Target Root Causes:**")
-st.sidebar.markdown(
-    "- 📏 `Sizing`\n"
-    "- 💔 `Damaged Item`\n"
-    "- 📦 `Wrong Product`\n"
-    "- 🚚 `Late Delivery`"
-)
-st.sidebar.markdown("---")
-mode_label = f"FastAPI ({API_URL})" if USE_REMOTE_API else "Standalone Cloud Engine (SQLite)"
-st.sidebar.caption(f"Backend Mode: `{mode_label}`")
-
-# --- Header ---
-st.title("📦 E-Commerce Customer Return Reason Classifier")
-st.caption("NLP-10 • Automated Root-Cause Triage (TF-IDF + Logistic Regression vs. DistilBERT) • FastAPI + SQLite")
-
+# --- Main Navigation Tabs ---
 tab1, tab2, tab3, tab4 = st.tabs([
     "🔍 Live Return Triage",
     "📂 Batch CSV Upload",
     "🗄️ Operations Database",
-    "📊 Model Comparison & Confusion Matrix",
+    "📊 Model Benchmark & Matrix",
 ])
 
 # --- TAB 1: SINGLE PREDICTION ---
 with tab1:
-    st.subheader("Classify Single Customer Return Comment")
-    col1, col2 = st.columns([1, 2])
-    with col1:
-        order_id = st.text_input("Order ID", value="ORD-702")
-    with col2:
-        comment = st.text_area(
-            "Customer Return Comment",
-            value="I ordered a blue jacket in medium, but they sent me a red sweater instead.",
-            height=100,
-        )
+    st.markdown("#### Quick-Fill Demo Presets")
+    p1, p2, p3, p4 = st.columns(4)
+    if "preset_oid" not in st.session_state:
+        st.session_state.preset_oid = "ORD-702"
+        st.session_state.preset_txt = "I ordered a blue jacket in medium, but they sent me a red sweater instead."
 
-    if st.button("Classify & Save to DB", type="primary"):
+    if p1.button("📏 Test Sizing", use_container_width=True):
+        st.session_state.preset_oid = "ORD-701"
+        st.session_state.preset_txt = "The dress runs way too tight around the shoulders and waist."
+    if p2.button("💔 Test Damaged", use_container_width=True):
+        st.session_state.preset_oid = "ORD-703"
+        st.session_state.preset_txt = "Zipper broke on first use and the side seam arrived torn."
+    if p3.button("📦 Test Wrong Item", use_container_width=True):
+        st.session_state.preset_oid = "ORD-702"
+        st.session_state.preset_txt = "I ordered a blue jacket in medium, but they sent me a red sweater instead."
+    if p4.button("🚚 Test Late Delivery", use_container_width=True):
+        st.session_state.preset_oid = "ORD-704"
+        st.session_state.preset_txt = "Package arrived 8 days after the promised delivery date."
+
+    st.markdown("---")
+    in_col1, in_col2 = st.columns([1, 2.4])
+    with in_col1:
+        order_id = st.text_input("Order ID", value=st.session_state.preset_oid)
+    with in_col2:
+        comment = st.text_area("Customer Return Comment", value=st.session_state.preset_txt, height=95)
+
+    if st.button("🚀 Classify & Log Return", type="primary"):
         if not comment.strip():
             st.warning("Please enter a customer return comment.")
         else:
             try:
-                with st.spinner("Running NLP inference..."):
+                with st.spinner("Analyzing customer return intent..."):
                     data = api_predict_single(order_id, comment, model_choice)
 
-                st.success(f"**Predicted Root Cause:** `{data['predicted_reason']}`  |  **Confidence:** `{data['confidence']*100:.2f}%`")
+                reason = data["predicted_reason"]
+                conf_pct = data["confidence"] * 100
+                meta = CATEGORY_META.get(reason, {"icon": "🏷️", "color": "#3B82F6", "action": "Route to support"})
+
+                st.markdown(
+                    f"""
+                    <div class="result-card">
+                        <span class="reason-pill" style="background:{meta['color']};">
+                            {meta['icon']} {reason}
+                        </span>
+                        <span style="font-size:1.05rem; font-weight:700;">
+                            Confidence: {conf_pct:.2f}%
+                        </span>
+                        <div style="margin-top:0.65rem; font-size:0.9rem; color:#CBD5E1;">
+                            <b>Recommended Ops Action:</b> {meta['action']} &nbsp;|&nbsp; <b>Logged Order:</b> <code>{data['order_id']}</code>
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
 
                 prob_df = pd.DataFrame({
                     "Return Reason": list(data["probabilities"].keys()),
                     "Probability": list(data["probabilities"].values()),
                 }).sort_values("Probability", ascending=True)
 
-                fig, ax = plt.subplots(figsize=(7, 2.8))
-                bars = ax.barh(prob_df["Return Reason"], prob_df["Probability"], color="#2563EB")
-                ax.set_xlim(0, 1.05)
-                ax.set_xlabel("Confidence Probability")
-                ax.set_title("Class Probability Distribution")
+                fig, ax = plt.subplots(figsize=(7.5, 2.7))
+                fig.patch.set_alpha(0.0)
+                ax.set_facecolor("none")
+                bar_colors = [CATEGORY_META.get(r, {}).get("color", "#3B82F6") for r in prob_df["Return Reason"]]
+                bars = ax.barh(prob_df["Return Reason"], prob_df["Probability"], color=bar_colors, height=0.58)
+                ax.set_xlim(0, 1.12)
+                ax.tick_params(colors="#E2E8F0", labelsize=9.5)
+                ax.spines["top"].set_visible(False)
+                ax.spines["right"].set_visible(False)
+                ax.spines["left"].set_color("#475569")
+                ax.spines["bottom"].set_color("#475569")
+                ax.set_title("Class Confidence Distribution", color="#F8FAFC", fontsize=10.5, fontweight="bold", loc="left")
                 for bar in bars:
                     w = bar.get_width()
-                    ax.text(w + 0.02, bar.get_y() + bar.get_height() / 2, f"{w*100:.1f}%", va="center", fontsize=9)
+                    ax.text(w + 0.02, bar.get_y() + bar.get_height() / 2, f"{w*100:.1f}%", va="center", color="#F8FAFC", fontweight="bold", fontsize=9)
                 st.pyplot(fig)
                 plt.close(fig)
             except Exception as e:
@@ -270,8 +456,8 @@ with tab1:
 
 # --- TAB 2: BATCH CSV UPLOAD ---
 with tab2:
-    st.subheader("Batch CSV Return Processing")
-    st.info("Upload a CSV containing a `comment` (or `review`) column and optional `order_id` column.")
+    st.markdown("#### Bulk Return Spreadsheet Triage")
+    st.info("Upload a `.csv` file with a `comment` (or `review`) column and optional `order_id` column to classify hundreds of returns at once.")
 
     sample_df = pd.DataFrame({
         "order_id": ["ORD-801", "ORD-802", "ORD-803", "ORD-804"],
@@ -289,18 +475,18 @@ with tab2:
         mime="text/csv",
     )
 
-    uploaded = st.file_uploader("Upload Return Comments CSV", type=["csv"])
-    if uploaded and st.button("Run Batch Classification", type="primary"):
+    uploaded = st.file_uploader("Drop Return Comments CSV Here", type=["csv"])
+    if uploaded and st.button("⚡ Run Batch Classification", type="primary"):
         try:
-            with st.spinner("Classifying batch comments..."):
+            with st.spinner("Processing batch rows & committing to SQLite..."):
                 out = api_predict_batch(uploaded, model_choice)
 
-            st.success(f"Processed and logged **{out['total_processed']}** return records!")
+            st.success(f"Successfully classified and logged **{out['total_processed']}** return records!")
             res_df = pd.DataFrame(out["results"])
             st.dataframe(res_df, use_container_width=True)
 
             st.download_button(
-                "⬇️ Download Categorized Results CSV",
+                "⬇️ Download Labeled Results CSV",
                 data=res_df.to_csv(index=False).encode("utf-8"),
                 file_name="categorized_returns.csv",
                 mime="text/csv",
@@ -310,10 +496,11 @@ with tab2:
 
 # --- TAB 3: SQLITE DATABASE VIEW ---
 with tab3:
-    st.subheader("Stored Return Classifications (SQLite)")
-    c1, c2 = st.columns([4, 1])
-    with c2:
-        if st.button("🗑️ Clear DB Logs"):
+    h_col1, h_col2 = st.columns([4, 1])
+    with h_col1:
+        st.markdown("#### Live Operations Audit Log (`returns.db`)")
+    with h_col2:
+        if st.button("🗑️ Clear Logs", use_container_width=True):
             try:
                 api_clear_records()
                 st.rerun()
@@ -323,40 +510,60 @@ with tab3:
     try:
         records = api_get_records(limit=200)
         if not records:
-            st.info("No return records logged yet. Classify a single comment or upload a CSV to populate SQLite.")
+            st.info("No return records logged yet. Run a prediction in Tab 1 or Tab 2 to populate SQLite.")
         else:
             df_rec = pd.DataFrame(records)
-            k1, k2, k3 = st.columns(3)
-            k1.metric("Total Logged Returns", len(df_rec))
-            k2.metric("Top Return Driver", df_rec["predicted_reason"].value_counts().idxmax())
-            k3.metric("Avg Model Confidence", f"{df_rec['confidence'].mean()*100:.1f}%")
+            top_driver = df_rec["predicted_reason"].value_counts().idxmax()
+            avg_conf = df_rec["confidence"].mean() * 100
 
-            st.bar_chart(df_rec["predicted_reason"].value_counts())
+            k1, k2, k3 = st.columns(3)
+            k1.markdown(
+                f'<div class="kpi-card"><div class="kpi-label">Total Processed Returns</div><div class="kpi-value">{len(df_rec)}</div></div>',
+                unsafe_allow_html=True,
+            )
+            k2.markdown(
+                f'<div class="kpi-card" style="border-left-color:#10B981;"><div class="kpi-label">Top Return Driver</div><div class="kpi-value">{top_driver}</div></div>',
+                unsafe_allow_html=True,
+            )
+            k3.markdown(
+                f'<div class="kpi-card" style="border-left-color:#8B5CF6;"><div class="kpi-label">Avg Model Confidence</div><div class="kpi-value">{avg_conf:.1f}%</div></div>',
+                unsafe_allow_html=True,
+            )
+
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.bar_chart(df_rec["predicted_reason"].value_counts(), color="#3B82F6")
             st.dataframe(df_rec, use_container_width=True)
     except Exception as e:
         st.error(f"Database error: {e}")
 
 # --- TAB 4: MODEL COMPARISON & CONFUSION MATRICES ---
 with tab4:
-    st.subheader("Benchmark Comparison: TF-IDF + Logistic Regression vs. DistilBERT")
+    st.markdown("#### Architecture Benchmark: Classical ML vs. Transformer")
     try:
         metrics = api_get_metrics()
         labels = metrics["labels"]
 
-        comp_df = pd.DataFrame([
-            {
-                "Model": "TF-IDF + Logistic Regression (Baseline)",
-                "Test Accuracy": f"{metrics['tfidf_logreg']['accuracy']*100:.2f}%",
-                "Macro F1-Score": f"{metrics['tfidf_logreg']['macro_f1']*100:.2f}%",
-            },
-            {
-                "Model": "DistilBERT (Fine-Tuned Transformer)",
-                "Test Accuracy": f"{metrics['distilbert']['accuracy']*100:.2f}%",
-                "Macro F1-Score": f"{metrics['distilbert']['macro_f1']*100:.2f}%",
-            },
-        ])
-        st.table(comp_df)
+        m_col1, m_col2 = st.columns(2)
+        m_col1.markdown(
+            f"""
+            <div class="kpi-card" style="border-left-color:#3B82F6;">
+                <div class="kpi-label">TF-IDF + Logistic Regression</div>
+                <div class="kpi-value">{metrics['tfidf_logreg']['accuracy']*100:.2f}% Acc &nbsp;|&nbsp; {metrics['tfidf_logreg']['macro_f1']*100:.2f}% F1</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        m_col2.markdown(
+            f"""
+            <div class="kpi-card" style="border-left-color:#8B5CF6;">
+                <div class="kpi-label">DistilBERT Fine-Tuned Transformer</div>
+                <div class="kpi-value">{metrics['distilbert']['accuracy']*100:.2f}% Acc &nbsp;|&nbsp; {metrics['distilbert']['macro_f1']*100:.2f}% F1</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
+        st.markdown("<br>", unsafe_allow_html=True)
         col_a, col_b = st.columns(2)
         with col_a:
             st.markdown("**TF-IDF + Logistic Regression — Confusion Matrix**")
@@ -376,7 +583,7 @@ with tab4:
             plt.close(fig1)
 
         with col_b:
-            st.markdown("**DistilBERT — Confusion Matrix**")
+            st.markdown("**DistilBERT Transformer — Confusion Matrix**")
             fig2, ax2 = plt.subplots(figsize=(5, 4))
             sns.heatmap(
                 metrics["distilbert"]["confusion_matrix"],
